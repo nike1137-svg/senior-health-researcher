@@ -1,0 +1,830 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시니어 건강 조사팀</title>
+<style>
+/* 화면 방식은 작성자가 만든 AI 회의실 — 어두운 사진 배경 · 원형 초상 · 진행 기록
+   한 쪽에 한 가지 일: ① 질문 고르기 → ② 회의실(보기) → ③ 결과(따져 보기)  (작성자 결정)
+   화면의 말은 누구나 알게 쉬운 말. 과제 용어는 ③ 에 괄호로 붙인다 */
+:root{
+  --ink:#fff; --muted:#bdbdbd; --dim:#8f8f8f; --line:rgba(255,255,255,.12); --line2:rgba(255,255,255,.22);
+  --card:rgba(12,14,18,.68); --card2:rgba(255,255,255,.06);
+  --run:#00bfff; --ok:#5fd38d; --ok-soft:rgba(95,211,141,.16); --bad:#ff7a7a; --bad-soft:rgba(255,122,122,.14);
+  --warn:#ffc05c; --warn-soft:rgba(255,192,92,.16);
+}
+*{box-sizing:border-box}
+html{background:#1b2027}
+body{margin:0;color:var(--ink);min-height:100vh;
+  font:15px/1.7 "Pretendard","Malgun Gothic","Apple SD Gothic Neo","Segoe UI",sans-serif;
+  background:#1b2027 url('https://images.unsplash.com/photo-1497366216548-37526070297c?w=1600&q=80') center/cover no-repeat fixed;}
+body::before{content:"";position:fixed;inset:0;background:rgba(8,10,14,.66);z-index:-1}
+button,select,input,textarea{font:inherit;color:inherit}
+.hide{display:none!important}
+.muted{color:var(--muted)} .small{font-size:13px} .ok{color:var(--ok)} .bad{color:var(--bad)} .warnc{color:var(--warn)}
+.term{color:var(--dim);font-weight:400;font-size:.9em}
+
+/* 머리줄 */
+.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:10px 18px;border-bottom:1px solid var(--line);background:rgba(0,0,0,.4);position:sticky;top:0;z-index:20;backdrop-filter:blur(6px)}
+.brand{font-weight:700;font-size:17px;cursor:pointer}
+.steps{display:flex;gap:4px;margin-right:auto;flex-wrap:wrap}
+.steps a{padding:3px 12px;border-radius:999px;color:var(--dim);text-decoration:none;font-size:14px}
+.steps a.now{background:#fff;color:#000;font-weight:700}
+.steps a.off{pointer-events:none;opacity:.45}
+#status{font-size:13px;color:var(--muted)}
+#status.run{color:var(--run)}
+.icon{border:1px solid var(--line2);background:transparent;padding:4px 12px;border-radius:8px;cursor:pointer;font-size:14px}
+.btn{border:1px solid var(--line2);background:rgba(255,255,255,.05);border-radius:8px;padding:6px 14px;cursor:pointer;font-size:14px}
+.btn.go{background:#00bfff;border-color:#00bfff;color:#000;font-weight:700}
+.btn.big{padding:10px 22px;font-size:16px}
+.btn:disabled{opacity:.4;cursor:default}
+.page{min-height:calc(100vh - 56px)}
+.wrap{max-width:960px;margin:0 auto;padding:24px 16px 48px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:14px 0;backdrop-filter:blur(4px)}
+.panel h2{font-size:14px;color:var(--muted);font-weight:700;margin:0 0 10px}
+.chip{display:inline-block;padding:1px 9px;border-radius:999px;border:1px solid var(--line2);font-size:13px;white-space:nowrap}
+
+/* ① 질문 고르기 */
+.hero{text-align:center;margin:18px 0 26px}
+.hero h1{font-size:26px;margin:0 0 6px}
+.hero p{margin:0;color:var(--muted)}
+.team{display:flex;justify-content:center;gap:10px;margin:16px 0 0}
+.team img{width:52px;height:52px;border-radius:50%;object-fit:cover;object-position:top;border:2px solid rgba(255,255,255,.85)}
+.qgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.qcard{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;cursor:pointer;text-align:left;transition:border-color .2s,transform .2s}
+.qcard:hover{border-color:rgba(255,255,255,.5);transform:translateY(-2px)}
+.qcard .qt{font-size:16.5px;font-weight:600;line-height:1.5}
+.qcard .qs{font-size:12.5px;color:var(--dim);margin-top:8px}
+.ask{display:flex;gap:8px;flex-wrap:wrap}
+.ask textarea{flex:1 1 320px;min-height:56px;resize:vertical;background:rgba(255,255,255,.06);border:1px solid var(--line2);border-radius:10px;padding:10px 12px}
+
+/* ② 회의실 */
+.room{display:grid;grid-template-columns:minmax(0,1fr) 300px;min-height:calc(100vh - 56px - 60px)}
+.minutes{padding:14px;overflow-y:auto;border-left:1px solid var(--line);max-height:calc(100vh - 116px);background:rgba(0,0,0,.5)}
+.minutes h3{font-size:12px;color:var(--dim);margin:0 0 10px;font-weight:600}
+.stage{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:22px 16px;min-width:0}
+.qbox{font-size:21px;font-weight:600;text-align:center;max-width:760px;line-height:1.5;text-shadow:0 1px 8px rgba(0,0,0,.9)}
+.qbox small{display:block;font-size:12.5px;font-weight:400;color:var(--muted);margin-top:4px}
+.row{display:flex;justify-content:center;width:100%}
+#agents{display:grid;justify-content:center;gap:clamp(4px,1.6vw,16px);grid-template-columns:repeat(var(--n,4),minmax(0,128px))}
+.card{display:flex;flex-direction:column;align-items:center;padding:10px 6px;border-radius:14px;width:128px;min-width:0;text-align:center}
+#agents .card{width:auto}
+.card.speaking{animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 10px rgba(0,191,255,.2);transform:scale(1)}50%{box-shadow:0 0 40px rgba(0,191,255,.8);transform:scale(1.03)}}
+.avatar{width:min(92px,100%);aspect-ratio:1;border-radius:50%;overflow:hidden;border:3px solid rgba(255,255,255,.85);margin-bottom:8px;background:#333}
+.avatar img{width:100%;height:100%;object-fit:cover;object-position:top;display:block}
+.nm{font-size:15px;font-weight:700;text-shadow:0 1px 6px rgba(0,0,0,.9)}
+.sub{font-size:12px;color:#d0d0d0;margin-top:1px;text-shadow:0 1px 4px rgba(0,0,0,.9);min-height:1.3em}
+.nm,.sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.pill{margin-top:7px;font-size:12px;padding:3px 10px;border-radius:999px;background:rgba(0,0,0,.5);color:#ddd;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill.run{background:rgba(0,191,255,.22);color:#c9f1ff}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.log{font-size:13px;line-height:1.6}
+.log div{padding:4px 6px;color:#dcdcdc}
+.log .t{color:var(--dim);font-variant-numeric:tabular-nums;margin-right:4px;font-size:11.5px}
+.log .stage-l{color:#fff;font-weight:700;margin-top:8px;border-bottom:1px solid var(--line)}
+.log .warn{color:var(--warn)}
+.log-empty{font-size:12.5px;color:var(--dim)}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:center;padding:12px 18px;background:rgba(0,0,0,.45);border-top:1px solid var(--line)}
+
+/* ③ 결과 */
+.answer{font-size:19px;line-height:1.8}
+.answer-src{margin-top:8px;font-size:13px;color:var(--muted)}
+.answer-src .chip{cursor:pointer}
+.disclaimer{margin-top:12px;font-size:12.5px;padding:8px 12px;border-radius:8px;background:var(--warn-soft);color:var(--warn)}
+.who{border-top:1px solid var(--line)}
+.who:first-of-type{border-top:0}
+.who-h{display:flex;align-items:center;gap:12px;padding:12px 4px;cursor:pointer;flex-wrap:wrap}
+.who-h img{width:44px;height:44px;border-radius:50%;object-fit:cover;object-position:top;border:2px solid rgba(255,255,255,.85)}
+.who-h .wn{font-weight:700;min-width:6.5em}
+.who-h .wp{flex:1 1 260px;color:var(--muted);font-size:13.5px}
+.who-h .arrow{color:var(--dim)}
+.who.open .arrow{transform:rotate(180deg)}
+.who-b{padding:0 4px 16px 60px}
+.who-b .lane-l{font-size:13px;font-weight:700;color:var(--muted);margin:12px 0 4px}
+.path{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.path .chip.start{border-color:#fff;font-weight:700}
+.memo details{border:1px solid var(--line);border-radius:10px;padding:6px 12px;margin:6px 0;background:rgba(255,255,255,.03)}
+.memo summary{cursor:pointer;font-weight:600;font-size:14px}
+.memo .body{font-size:14px;white-space:pre-wrap;margin-top:6px;color:#ddd}
+.draft p{margin:0 0 6px;padding-left:10px;border-left:3px solid transparent}
+.draft p.nocite{border-left-color:var(--line2);color:var(--dim)}
+.cite{display:inline-block;border-radius:6px;padding:0 6px;margin:0 2px;font-size:13px;cursor:pointer;border:1px solid}
+.cite.read{background:var(--ok-soft);color:var(--ok);border-color:var(--ok)}
+.cite.unread{background:var(--bad-soft);color:var(--bad);border-color:var(--bad);font-weight:700}
+.peek{margin:6px 0 10px 10px;padding:10px 14px;border-radius:10px;background:rgba(255,255,255,.04);border:1px dashed rgba(255,255,255,.4);font-size:14px}
+.peek mark{background:rgba(255,192,92,.3);color:inherit;padding:0 2px;border-radius:3px}
+.legend{font-size:12.5px;color:var(--muted);display:flex;flex-wrap:wrap;gap:12px;margin-bottom:6px}
+.oneliner{font-size:14px;padding:8px 12px;border-radius:10px;background:rgba(255,255,255,.05)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12.5px;color:var(--muted);font-weight:700}
+.tablewrap{overflow-x:auto}
+.fix{margin-top:10px;font-size:13px;color:var(--warn)}
+details.fold>summary{cursor:pointer;font-weight:700;color:var(--muted);font-size:14px}
+.report h3{font-size:18px;margin:18px 0 6px} .report h4{font-size:16px;margin:16px 0 4px}
+.report blockquote{margin:8px 0;padding:6px 12px;border-left:4px solid var(--line2);color:var(--muted)}
+.metrics td:nth-child(2){white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:700}
+.metrics tr.alarm td{color:var(--bad)}
+.seg{display:flex;gap:4px;flex-wrap:wrap}
+.seg button{border:1px solid var(--line2);background:rgba(255,255,255,.04);border-radius:8px;padding:4px 11px;cursor:pointer;font-size:13.5px}
+.seg button[aria-pressed="true"]{background:#fff;color:#000;border-color:#fff}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+
+/* 키 설정 */
+.keyrow{display:flex;gap:8px}
+.keyrow input{flex:1;min-width:0;background:rgba(255,255,255,.06);border:1px solid var(--line2);border-radius:8px;padding:9px 12px;font-family:ui-monospace,Consolas,monospace}
+.keysave{display:flex;gap:8px;align-items:center;margin:10px 0;cursor:pointer}
+.keystate{margin-top:12px;padding:8px 12px;border-radius:8px;background:rgba(255,255,255,.05)}
+.keystate.on{background:var(--ok-soft);color:var(--ok)}
+footer{padding:0 16px 30px;font-size:12px;color:var(--dim);text-align:center}
+
+@media (max-width:900px){
+  .room{grid-template-columns:minmax(0,1fr)}
+  .minutes{border-left:0;border-top:1px solid var(--line);max-height:260px}
+  .card{width:112px;padding:6px 4px}
+  .nm{font-size:13px} .pill{font-size:11px;padding:2px 7px}
+  .qbox{font-size:17px}
+  .who-b{padding-left:4px}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand" onclick="location.hash='#고르기'">시니어 건강 조사팀</div>
+  <nav class="steps">
+    <a href="#고르기" data-p="고르기">① 질문 고르기</a>
+    <a href="#회의실" data-p="회의실">② 회의실</a>
+    <a href="#결과" data-p="결과">③ 결과</a>
+  </nav>
+  <span id="status"></span>
+  <button class="icon" onclick="location.hash='#키'" title="키 설정">⚙ 키</button>
+  <button class="icon" id="sound" title="다음 단계에서 만듭니다">🔈</button>
+</header>
+
+<!-- ───────── ① 질문 고르기 ───────── -->
+<section class="page" id="p-고르기"><div class="wrap">
+  <div class="hero">
+    <h1>어르신 건강이 궁금할 때</h1>
+    <p>질문 하나를 <b style="color:#fff">네 명이 나눠서</b> 자료를 찾아 읽고, <b style="color:#fff">팀장이 모아서</b> 한마디로 정리합니다.</p>
+    <div class="team" id="team"></div>
+  </div>
+  <div class="panel">
+    <h2>지난 기록으로 보기 — 키 없이 · 0원</h2>
+    <div class="qgrid" id="qgrid"></div>
+  </div>
+  <div class="panel">
+    <h2>직접 물어보기 — 내 OpenAI 키로 · 한 번에 약 30원</h2>
+    <div class="ask">
+      <textarea id="live-q" placeholder="우리 아버지가 밤에 자주 깨시는데 괜찮은 건가요?"></textarea>
+      <button class="btn" id="mic" hidden>🎤 말하기</button>
+      <button class="btn go" id="live-go" disabled>물어보기</button>
+    </div>
+    <div class="small muted" id="live-note" style="margin-top:6px"></div>
+    <div class="small warnc" id="mic-note" style="margin-top:4px"></div>
+  </div>
+</div></section>
+
+<!-- ───────── ② 회의실 ───────── -->
+<section class="page hide" id="p-회의실">
+  <div class="room">
+    <div class="stage">
+      <div class="qbox" id="qtext">…</div>
+      <div class="row" id="coord"></div>
+      <div id="agents"></div>
+    </div>
+    <aside class="minutes">
+      <h3>진행 기록 — 누가 무엇을 읽고 무엇을 썼나</h3>
+      <div class="log" id="log"></div>
+    </aside>
+  </div>
+  <div class="bar">
+    <button class="btn" onclick="location.hash='#고르기'">← 다른 질문</button>
+    <button class="btn" id="play">▶ 처음부터</button>
+    <button class="btn" id="speed" title="빠르기">1배</button>
+    <button class="btn" id="skip">건너뛰기</button>
+    <button class="btn go big" id="to-result">결과 보기 →</button>
+  </div>
+</section>
+
+<!-- ───────── ③ 결과 ───────── -->
+<section class="page hide" id="p-결과"><div class="wrap">
+  <div class="panel">
+    <div class="muted small" id="r-q"></div>
+    <h2 style="margin-top:10px;color:#fff;font-size:15px;display:flex;align-items:center;gap:10px">한마디로 <button class="btn" id="listen">🔊 듣기</button></h2>
+    <div class="answer" id="r-answer"></div>
+    <div class="answer-src" id="r-src"></div>
+    <div class="disclaimer" id="r-disc"></div>
+    <div class="actions">
+      <button class="btn" id="save">보고서 저장</button>
+      <button class="btn" onclick="location.hash='#회의실'">← 회의실 다시 보기</button>
+      <button class="btn" onclick="location.hash='#고르기'">다른 질문</button>
+    </div>
+  </div>
+  <div class="panel">
+    <h2>누가 무엇을 읽고 무엇을 썼나 — 사람을 누르면 펼쳐져요</h2>
+    <div id="r-who"></div>
+  </div>
+  <div class="panel"><details class="fold" id="fold-report"><summary>보고서 전문</summary><div class="report" id="report"></div></details></div>
+  <div class="panel"><details class="fold" id="fold-cmp"><summary>다르게 돌린 것과 비교</summary>
+    <div class="small muted" style="margin:10px 0 6px">같은 질문을 장치 하나씩 끄고 돌린 기록이에요. 누르면 이 쪽이 그 기록으로 바뀌어요.</div>
+    <div class="seg" id="cfg"></div><div class="small muted" id="cfg-hint" style="margin-top:6px"></div>
+    <div class="seg" id="round" style="margin-top:10px"></div>
+  </details></div>
+  <div class="panel"><details class="fold"><summary>숫자로 보기 <span class="term">(지표 — 참고용. 순위표로 쓰지 않는다)</span></summary><div class="tablewrap" id="metrics"></div></details></div>
+</div></section>
+
+<!-- ───────── 키 설정 ───────── -->
+<section class="page hide" id="p-키"><div class="wrap" style="max-width:720px">
+  <div class="panel">
+    <h2 style="font-size:17px;color:var(--ink)">OpenAI 키</h2>
+    <div class="muted" style="margin-bottom:12px"><b style="color:var(--ink)">지난 기록 보기는 키가 필요 없어요.</b> 키는 「직접 물어보기」로 내 질문을 돌릴 때만 씁니다.</div>
+    <div class="keyrow">
+      <input id="key" type="password" placeholder="sk-…" autocomplete="off" spellcheck="false" aria-label="OpenAI 키">
+      <button class="btn" id="key-show" type="button">보기</button>
+    </div>
+    <label class="keysave"><input type="checkbox" id="key-keep"> 이 브라우저에 저장해 두기 <span class="muted small">— 이 컴퓨터를 나만 쓸 때만</span></label>
+    <div class="actions" style="margin-top:0">
+      <button class="btn go" id="key-set">넣기</button>
+      <button class="btn" id="key-check">키 확인 (0원)</button>
+      <button class="btn" id="key-del">저장한 키 지우기</button>
+      <button class="btn" onclick="history.length > 1 ? history.back() : location.hash='#고르기'">← 돌아가기</button>
+    </div>
+    <div id="key-state" class="keystate">키 없음</div>
+    <div id="key-msg" class="small" style="min-height:1.6em"></div>
+  </div>
+  <div class="panel small" style="line-height:1.9">
+    <h2>알아 두실 것</h2>
+    <ul style="margin:0;padding-left:18px">
+      <li>키는 <b>이 브라우저</b>와, 서버로 가는 <b>요청 머리</b>에만 있어요. 서버는 키를 저장하지도 기록하지도 않아요.</li>
+      <li>「넣기」만 하면 <b>이 창에만</b> 있고, 창을 닫으면 사라져요. 「저장해 두기」를 켜면 이 브라우저에 남아요.</li>
+      <li>비용은 <b>키 주인에게</b> 청구돼요. 질문 한 번에 약 30원(gpt-4o-mini)이고, 한 번에 약 100원이 넘으면 자동으로 멈춰요.</li>
+      <li>「키 확인」은 모델 목록만 불러 보는 것이라 돈이 들지 않아요.</li>
+      <li>키 만드는 곳: platform.openai.com → API keys. OpenAI API 는 미리 충전한 금액에서 빠지고, <b>자동 충전</b>을 켜 두면 자동으로 결제돼요. 켜져 있는지 한번 확인하세요.</li>
+      <li>남과 같이 쓰는 컴퓨터에서는 저장하지 마세요.</li>
+    </ul>
+  </div>
+</div></section>
+
+<footer>한국어 위키백과 문서와 법령을 정리한 것입니다. 의학적 진단·처방이 아닙니다. · 직접 물어보기는 내 키로만 돌아가요. 키는 이 서버에 저장되지 않아요. · 배경 사진 Unsplash</footer>
+
+<script>
+/* ───────── 쉬운 말 — 화면에만. 코드 · 기록 · REPORT 는 과제 용어 그대로 ───────── */
+const 설정말 = {
+  "기본":     ["기본", "모든 장치를 켠 기준"],
+  "배정끔":   ["첫 자료 안 정해 줌", "팀장이 조사원에게 처음 읽을 자료를 정해 주지 않는다 (배정 끔)"],
+  "구역끔":   ["겹쳐 읽기 허용", "다른 조사원이 맡은 자료를 알려 주지 않는다 — 같은 자료를 겹쳐 읽을 수 있다 (구역 끔)"],
+  "역할끔":   ["역할 없음", "증상·원인·진단·치료·제도 같은 역할 없이 모두 그냥 조사원 (역할 끔)"],
+  "혼자":     ["한 명이 전부", "비교용 — 나누지 않고 한 명이 같은 양(자료 12개)을 혼자 읽고 쓴다 (대조군)"],
+  "절예산4":  ["자료 4개씩", "조사원마다 3개가 아니라 4개씩 읽는다 (절예산 4)"],
+  "경로시험": ["자료 1개씩만", "조사원마다 1개만 읽힌다 — 모자라면 더 찾겠다고 하는지 본 시험"],
+  "R0 기본":  ["법령 빼고", "법령 6개 없이 위키백과 57개만 두고 돌린 기준"],
+};
+const 설정순서 = ["기본","배정끔","구역끔","역할끔","혼자","절예산4","경로시험","R0 기본"];
+const 쉬운역할 = r => r === "조사관" ? "조사원" : r === "혼자" ? "혼자 조사" : (r || "조사원").replace(" 담당", " 조사");
+const 몇번째 = n => ({"1":"첫 번째","2":"두 번째"}[n] || n + "번째") + " 실행";
+const 받침 = w => { const c = String(w).trim().slice(-1).charCodeAt(0); return c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28 !== 0; };
+const 이가 = w => w + (받침(w) ? "이" : "가");
+const 을를 = (w, 감싼 = w) => 감싼 + (받침(w) ? "을" : "를");
+const 괄 = t => `「${t}」`;
+
+/* 초상 — 마커스 회의실 이미지 (작성자가 만든 것). 팀장은 TECH 그림, 조사원은 여자 초상 넷.
+   치료 · 제도가 같은 초상(omega)을 원하지만 88편 중 한 실행에 둘이 같이 나온 적은 없다.
+   같이 나오면 그 실행에서 비어 있는 초상을 준다 (한 실행에 조사원은 최대 넷) */
+const 팀장초상 = "tech";
+const 여자초상 = ["hyeyoung","jiyeon","jisoo","omega"];
+const 역할초상 = {"증상 담당":"hyeyoung","원인 담당":"jiyeon","진단 담당":"jisoo","치료 담당":"omega","제도 담당":"omega"};
+function 초상나누기(역할들){
+  const 쓴 = new Set();
+  const 먼저 = 역할들.map(r => { const p = 역할초상[r]; if (p && !쓴.has(p)){ 쓴.add(p); return p; } return null; });
+  return 먼저.map((p, i) => p || (() => { const x = 여자초상.find(y => !쓴.has(y)) || 여자초상[i % 4]; 쓴.add(x); return x; })());
+}
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const 저장 = {
+  get(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch{ return null; } },
+  set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} },
+};
+
+/* ───────── 쪽 넘기기 — 주소 끝(#고르기 · #회의실 · #결과 · #키) ───────── */
+function 쪽(){
+  let p = decodeURIComponent(location.hash.slice(1)) || "고르기";
+  if (!["고르기","회의실","결과","키"].includes(p)) p = "고르기";
+  if ((p === "회의실" || p === "결과") && !방.d) p = "고르기";
+  document.querySelectorAll(".page").forEach(s => s.classList.toggle("hide", s.id !== "p-" + p));
+  document.querySelectorAll(".steps a").forEach(a => {
+    a.classList.toggle("now", a.dataset.p === p);
+    a.classList.toggle("off", (a.dataset.p === "회의실" && !방.d) || (a.dataset.p === "결과" && (!방.d || 방.d.진행중)));
+  });
+  if (p === "결과" && 방.d?.진행중){ location.hash = "#회의실"; return; }
+  if (p !== "회의실" && !방.d?.진행중) 방.멈춤();       // 회의실을 떠나면 재생을 멈춘다 (라이브는 서버에서 계속 돈다)
+  if (p === "결과") 결과그리기();
+  window.scrollTo(0, 0);
+}
+window.addEventListener("hashchange", 쪽);
+
+/* ───────── ② 회의실 — 다시 보기와 직접 물어보기가 같이 쓴다 ───────── */
+const 방 = {
+  속도: 1, 즉시: false, 번호: 0, d: null, 시작: 0, 사람: [], 끝남: false,
+
+  쉼(ms){
+    const 나 = this.번호;
+    if (this.즉시) return Promise.resolve().then(() => { if (나 !== this.번호) throw "멈춤"; });
+    return new Promise((ok, no) => setTimeout(() => 나 === this.번호 ? ok() : no("멈춤"), ms / this.속도));
+  },
+  멈춤(){ this.번호++; },
+
+  준비(d){
+    this.번호++; this.d = d; this.시작 = 0; this.끝남 = false;
+    this.사람그리기(d);
+    $("#qtext").innerHTML = `${esc(d.질문)}<small>${d.라이브 ? "직접 물어본 질문" : `지난 기록 · ${esc(설정말[d.설정]?.[0] || d.설정)} · ${esc(몇번째(d.회차))}`}</small>`;
+    $("#log").innerHTML = `<div class="log-empty">▶ 처음부터를 누르면 여기에 한 줄씩 쌓입니다.</div>`;
+    this.상태("");
+  },
+
+  사람그리기(d){                                  // 라이브는 목차가 나온 뒤에 한 번 더 부른다
+    const 혼자 = d.설정 === "혼자";
+    this.사람 = [];
+    if (!혼자) this.사람.push({id:"코디", 이름:"팀장", 부:"나누고 · 모아 정리", img:팀장초상});
+    const 초상들 = 초상나누기(d.절들.map(s => s.역할));
+    d.절들.forEach((s, i) => this.사람.push({id:"s" + s.번호, 이름: 쉬운역할(혼자 ? "혼자" : s.역할),
+      부: s.절 && s.절 !== s.역할 ? `${괄(s.절)} 맡음` : "", img: 초상들[i]}));
+
+    const 카드 = p => `<div class="card" data-id="${p.id}"><div class="avatar"><img src="/static/img/${p.img}.jpg" alt=""></div>
+      <div class="nm">${esc(p.이름)}</div><div class="sub">${esc(p.부)}</div><div class="pill">기다리는 중</div></div>`;
+    $("#coord").innerHTML = 혼자 ? "" : 카드(this.사람[0]);
+    $("#agents").innerHTML = this.사람.filter(p => p.id !== "코디").map(카드).join("");
+    $("#agents").style.setProperty("--n", Math.max(1, d.절들.length));
+  },
+
+  누구(id){ return (this.사람.find(p => p.id === id) || {}).이름 || ""; },
+  카드(id){ return document.querySelector(`.card[data-id="${id}"]`); },
+  알약(id, 글, 꼴 = ""){
+    const c = this.카드(id); if (!c) return;
+    const p = c.querySelector(".pill"); p.textContent = 글; p.title = 글; p.className = "pill " + 꼴;
+  },
+  말함(id, 켬){ this.카드(id)?.classList.toggle("speaking", 켬); },
+  상태(글, 도는중 = false){ $("#status").textContent = 글; $("#status").classList.toggle("run", 도는중); },
+  법령인가(문서){ return (this.d?.법령 || []).includes(문서); },
+
+  기록(글, 꼴 = ""){
+    const box = $("#log"); box.querySelector(".log-empty")?.remove();
+    const el = document.createElement("div");
+    if (꼴 === "단계"){ el.className = "stage-l"; el.textContent = 글; }
+    else {
+      const 초 = Math.round((performance.now() - this.시작) / 1000 * this.속도);
+      const 때 = this.즉시 ? "" : `${Math.floor(초 / 60)}:${String(초 % 60).padStart(2, "0")}`;
+      el.innerHTML = `${때 ? `<span class="t">${때}</span>` : ""}<span class="${꼴}">${esc(글)}</span>`;
+    }
+    box.appendChild(el); box.scrollTop = box.scrollHeight;
+  },
+};
+
+/* 기록을 순서대로 다시 튼다 */
+async function 재생(){
+  const d = 방.d; if (!d) return;
+  방.준비(d); 방.시작 = performance.now();
+  const 혼자 = d.설정 === "혼자", m = d.계량 || {};
+  try {
+    if (!혼자){
+      방.상태("① 나누는 중", true); 방.기록("① 나누기", "단계");
+      방.말함("코디", true); 방.알약("코디", "질문을 나누는 중", "run");
+      await 방.쉼(1300);
+      방.기록(`팀장이 질문을 ${d.목차.length}개 주제로 나눴어요 — ${d.목차.map(t => 괄(t.절)).join(" ")}`);
+      방.기록("팀장은 자료 원문을 보지 않고 제목과 첫머리만 봤어요");
+      if ((d.고침 || []).length) 방.기록(`⚠ 팀장이 잘못 나눈 곳을 프로그램이 ${d.고침.length}곳 바로잡았어요`, "warn");
+      await 방.쉼(800);
+      d.절들.forEach(s => { 방.알약("s" + s.번호, `${괄(s.절)} 맡음`); 방.기록(`${이가(방.누구("s" + s.번호))} ${을를(s.절, 괄(s.절))} 맡았어요`); });
+      방.알약("코디", `${d.절들.length}명에게 나눠 줌`); 방.말함("코디", false);
+      await 방.쉼(1000);
+    }
+
+    방.상태("② 찾아 읽는 중", true); 방.기록(혼자 ? "한 명이 혼자 찾아 읽기" : "② 찾아 읽기 — 네 명이 동시에", "단계");
+    await Promise.all(d.절들.map(async (s, i) => {
+      const id = "s" + s.번호, 누가 = 방.누구(id);
+      await 방.쉼(i * 300);
+      방.말함(id, true);
+      for (const 문서 of (s.읽음 || [])){
+        방.알약(id, `${괄(문서)} 읽는 중`, "run");
+        await 방.쉼(혼자 ? 700 : 1200);
+        const 메모 = (s.메모 || []).find(x => x.문서 === 문서);
+        방.기록(`${이가(누가)} ${괄(문서)}${방.법령인가(문서) ? " 법령을" : " 자료를"} 읽었어요${메모 ? ` → 메모 ${메모.메모.length}자` : ""}`);
+      }
+      방.알약(id, "글 쓰는 중", "run");
+      await 방.쉼(1100);
+      방.말함(id, false);
+      const 더 = !혼자 && s.충분 === false;
+      방.알약(id, s.인용수 ? `출처 ${s.인용수}곳 붙임` : "출처 없음", s.인용수 && !더 ? "ok" : "warn");
+      방.기록(`${이가(누가)} 글을 썼어요 — ${s.원고.length}문장, ${s.인용수 ? `출처 ${s.인용수}곳` : "출처 없음"}${더 ? " · 더 찾아야 한다고 함" : ""}`, s.인용수 && !더 ? "" : "warn");
+    }));
+
+    방.상태("③ 모아 정리하는 중", true); 방.기록("③ 모아 정리", "단계");
+    if (!혼자){
+      const 부족 = d.절들.filter(s => s.충분 === false).length;
+      방.기록(부족 ? `팀장이 확인했어요 — 더 찾아야 할 주제 ${부족}개 → 다시 보냄` : "팀장이 확인했어요 — 빠진 주제 없음");
+      방.말함("코디", true); 방.알약("코디", "모아 정리하는 중", "run");
+    }
+    await 방.쉼(1300);
+    if (d.한마디로) 방.기록(`${혼자 ? "" : "팀장이 "}한마디로 정리했어요 — 결과 쪽에서 볼 수 있어요`);
+    if (!혼자){ 방.말함("코디", false); 방.알약("코디", "정리 끝", "ok"); }
+    방.상태("끝 — 결과를 보세요");
+    방.끝남 = true;
+    $("#to-result").classList.add("go");
+  } catch (e) { if (e !== "멈춤") throw e; }
+}
+
+$("#play").onclick = () => { 방.즉시 = false; 재생(); };
+$("#skip").onclick = () => { 방.즉시 = true; 재생().then(() => { 방.즉시 = false; }); };
+$("#speed").onclick = () => { 방.속도 = {1:2, 2:4, 4:1}[방.속도]; $("#speed").textContent = 방.속도 + "배"; };
+$("#to-result").onclick = () => { location.hash = "#결과"; };
+
+/* ───────── ① 질문 고르기 ───────── */
+let 목록 = [], 고름 = 저장.get("재생.고름") || {질문ID:"M1", 설정:"기본", 회차:"1"};
+
+async function 시작(){
+  $("#team").innerHTML = [팀장초상, ...여자초상].map(x => `<img src="/static/img/${x}.jpg" alt="">`).join("");
+  목록 = (await (await fetch("/api/runs")).json()).filter(r => r.단계 !== "라이브");
+  const 질문들 = [...new Map(목록.map(r => [r.질문ID, r])).values()];
+  $("#qgrid").innerHTML = 질문들.map(r => `<button class="qcard" data-q="${esc(r.질문ID)}">
+      <div class="qt">${esc(r.질문)}</div><div class="qs">지난 기록 보기 →</div></button>`).join("");
+  document.querySelectorAll(".qcard").forEach(b => b.onclick = () => 질문열기(b.dataset.q));
+  쪽();
+}
+
+async function 질문열기(qid){
+  고름 = {질문ID: qid, 설정: "기본", 회차: "1"}; 저장.set("재생.고름", 고름);
+  const r = 목록.find(x => x.질문ID === qid && x.설정 === "기본" && x.회차 === "1") || 목록.find(x => x.질문ID === qid);
+  await 불러오기(r.id);
+  location.hash = "#회의실";
+  방.즉시 = false; 재생();
+}
+
+async function 불러오기(id){
+  const d = await (await fetch("/api/runs/" + id)).json();
+  고름 = {질문ID: d.질문ID, 설정: d.설정, 회차: d.회차}; 저장.set("재생.고름", 고름);
+  방.준비(d);
+  $("#to-result").classList.remove("go");
+  return d;
+}
+
+/* ───────── 직접 물어보기 — 서버가 흘려보내는 진행 알림으로 같은 회의실을 움직인다 ───────── */
+function 조작잠금(켬){
+  ["#play", "#skip", "#speed"].forEach(s => $(s).disabled = 켬);
+  $("#to-result").disabled = 켬;
+}
+
+async function 라이브돌리기(질문, 스텁 = false){
+  const d = {질문, 설정:"기본", 절들:[], 목차:[], 라이브:true, 진행중:true, 법령:[], 위키수:0};
+  방.준비(d); 방.시작 = performance.now(); 방.즉시 = false; 방.속도 = 1;
+  $("#to-result").classList.remove("go"); 조작잠금(true);
+  $("#log").innerHTML = "";
+  location.hash = "#회의실";
+  방.상태("① 나누는 중", true); 방.기록("① 나누기", "단계");
+  방.말함("코디", true); 방.알약("코디", "질문을 나누는 중", "run");
+
+  let 응답;
+  try {
+    응답 = await fetch("/api/라이브", {method:"POST", headers:{"Content-Type":"application/json", ...키상자.머리()},
+                                    body: JSON.stringify({질문, 스텁})});
+  } catch { return 라이브끝(d, {종류:"오류", 까닭:"서버에 닿지 못했어요."}); }
+  if (!응답.ok){
+    const e = await 응답.json().catch(() => ({}));
+    return 라이브끝(d, {종류:"오류", 까닭: e.detail || "시작하지 못했어요."});
+  }
+  const 읽개 = 응답.body.getReader(), 풀개 = new TextDecoder();
+  let 남은 = "";
+  while (true){
+    const {value, done} = await 읽개.read();
+    if (done) break;
+    남은 += 풀개.decode(value, {stream:true});
+    let i;
+    while ((i = 남은.indexOf("\n\n")) >= 0){
+      const 덩이 = 남은.slice(0, i); 남은 = 남은.slice(i + 2);
+      if (!덩이.startsWith("data: ")) continue;       // ": 살아 있음" 같은 빈 신호는 넘긴다
+      const x = JSON.parse(덩이.slice(6));
+      if (x.종류 === "끝" || x.종류 === "오류") return 라이브끝(d, x);
+      라이브사건(d, x);
+    }
+  }
+  라이브끝(d, {종류:"오류", 까닭:"연결이 끊겼어요."});
+}
+
+function 라이브사건(d, x){
+  const 누구 = n => 방.누구("s" + n);
+  switch (x.종류){
+    case "시작":
+      d.법령 = x.법령; d.위키수 = x.위키수;
+      break;
+    case "목차":
+      d.목차 = x.목차; d.고침 = x.고침;
+      d.절들 = x.목차.map((t, i) => ({번호:i, 절:t.절, 역할:t.역할, 읽음:[], 메모:[]}));
+      방.사람그리기(d);
+      방.알약("코디", `${d.절들.length}명에게 나눠 줌`); 방.말함("코디", false);
+      방.기록(`팀장이 질문을 ${x.목차.length}개 주제로 나눴어요 — ${x.목차.map(t => 괄(t.절)).join(" ")}`);
+      방.기록("팀장은 자료 원문을 보지 않고 제목과 첫머리만 봤어요");
+      if ((x.고침 || []).length) 방.기록(`⚠ 팀장이 잘못 나눈 곳을 프로그램이 ${x.고침.length}곳 바로잡았어요`, "warn");
+      d.절들.forEach(s => { 방.알약("s" + s.번호, `${괄(s.절)} 맡음`); 방.기록(`${이가(누구(s.번호))} ${을를(s.절, 괄(s.절))} 맡았어요`); });
+      방.상태("② 찾아 읽는 중", true); 방.기록("② 찾아 읽기 — 네 명이 동시에", "단계");
+      break;
+    case "읽기":
+      방.말함("s" + x.번호, true); 방.알약("s" + x.번호, `${괄(x.문서)} 읽는 중`, "run");
+      break;
+    case "메모":
+      방.기록(`${이가(누구(x.번호))} ${괄(x.문서)}${(d.법령 || []).includes(x.문서) ? " 법령을" : " 자료를"} 읽었어요 → ${x.빈손 ? "관련 없음" : `메모 ${x.글자}자`}`, x.빈손 ? "warn" : "");
+      break;
+    case "원고": {
+      const id = "s" + x.번호, 더 = x.충분 === false;
+      방.말함(id, false);
+      방.알약(id, x.인용수 ? `출처 ${x.인용수}곳 붙임` : "출처 없음", x.인용수 && !더 ? "ok" : "warn");
+      방.기록(`${이가(누구(x.번호))} 글을 썼어요 — ${x.문장수}문장, ${x.인용수 ? `출처 ${x.인용수}곳` : "출처 없음"}${더 ? " · 더 찾아야 한다고 함" : ""}`, x.인용수 && !더 ? "" : "warn");
+      break;
+    }
+    case "점검":
+      if ((x.다시 || []).length){
+        방.기록(`팀장이 확인했어요 — 더 찾아야 할 주제 ${x.다시.length}개 → 다시 보냄`, "warn");
+        방.상태("② 다시 찾아 읽는 중", true); 방.기록(`② 찾아 읽기 — ${x.바퀴 + 1}번째`, "단계");
+      } else {
+        방.상태("③ 모아 정리하는 중", true); 방.기록("③ 모아 정리", "단계");
+        방.기록(x.종료 === "충분" ? "팀장이 확인했어요 — 빠진 주제 없음" : "팀장이 확인했어요 — 정해진 횟수를 다 써서 정리로 넘어감");
+        방.말함("코디", true); 방.알약("코디", "모아 정리하는 중", "run");
+      }
+      break;
+    case "종합":
+      방.말함("코디", false); 방.알약("코디", "정리 끝", "ok");
+      방.기록("팀장이 한마디로 정리했어요 — 결과 쪽에서 볼 수 있어요");
+      break;
+  }
+}
+
+async function 라이브끝(d, x){
+  조작잠금(false);
+  document.querySelectorAll(".card.speaking").forEach(c => c.classList.remove("speaking"));
+  if (x.종류 === "오류"){
+    d.진행중 = false; 방.d = null;
+    방.기록(`⚠ ${x.까닭}`, "warn"); 방.상태("멈춤");
+    $("#to-result").disabled = true;
+    return;
+  }
+  if (x.id == null){                                   // 스텁 시험 — 기록을 남기지 않았다
+    d.진행중 = false; 방.기록("끝 (배선 시험 — 기록 안 함)"); 방.상태("끝"); return;
+  }
+  const 전부 = await (await fetch("/api/runs/" + x.id)).json();
+  방.d = 전부; 방.끝남 = true;
+  방.기록(`끝 — 이번에 든 돈 약 ${Math.round(x.비용원)}원`);
+  방.상태("끝 — 결과를 보세요");
+  $("#to-result").classList.add("go");
+  쪽();
+}
+
+/* 🎤 말하기 — 브라우저 음성 인식 (크롬 · 엣지). 말한 것을 칸에 넣기만 하고, 물어보기는 직접 누른다 (키 · 돈이 드는 일) */
+const 인식기 = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (인식기){
+  const rec = new 인식기();
+  rec.lang = "ko-KR"; rec.continuous = false; rec.interimResults = true; rec.maxAlternatives = 1;
+  let 듣는중 = false, 앞 = "", 확정 = "";
+  const 끝 = () => { 듣는중 = false; $("#mic").textContent = "🎤 말하기"; };
+  $("#mic").hidden = false;
+  $("#mic").onclick = () => {
+    if (듣는중){ rec.stop(); return; }
+    앞 = $("#live-q").value ? $("#live-q").value.trimEnd() + " " : ""; 확정 = "";
+    $("#mic-note").textContent = "";
+    try { rec.start(); 듣는중 = true; $("#mic").textContent = "● 듣는 중 (누르면 끝)"; } catch (e) { 끝(); }
+  };
+  rec.onresult = e => {
+    let 중간 = "";
+    for (let i = e.resultIndex; i < e.results.length; i++){
+      const 조각 = e.results[i][0].transcript;
+      if (e.results[i].isFinal) 확정 += 조각; else 중간 += 조각;
+    }
+    $("#live-q").value = 앞 + 확정 + 중간;
+  };
+  rec.onend = 끝;
+  rec.onerror = e => {
+    const 말 = {"not-allowed": "마이크 권한이 필요해요. 주소창 왼쪽에서 마이크를 허용해 주세요.",
+                "audio-capture": "마이크를 쓸 수 없어요.", "network": "음성 인식 서버에 연결하지 못했어요."}[e.error];
+    if (말) $("#mic-note").textContent = 말;     // no-speech · aborted 는 정상이라 조용히 넘어간다
+    끝();
+  };
+}
+
+$("#live-go").onclick = () => {
+  const 질문 = $("#live-q").value.trim();
+  if (질문.length < 5){ $("#live-note").innerHTML = `<span class="warnc">질문을 5자 이상 적어 주세요.</span>`; return; }
+  if (!키상자.값){ location.hash = "#키"; return; }
+  라이브돌리기(질문);
+};
+
+/* ───────── ③ 결과 ───────── */
+/* 🔊 듣기 — 서버가 이 기록의 「한마디로」 만 읽어 준다 (edge-tts) */
+const 소리 = new Audio();
+function 듣기멈춤(){ 소리.pause(); 소리.removeAttribute("src"); $("#listen").textContent = "🔊 듣기"; }
+소리.onended = 듣기멈춤;
+$("#listen").onclick = async () => {
+  if (!소리.paused){ 듣기멈춤(); return; }
+  const b = $("#listen"); b.textContent = "소리 만드는 중…"; b.disabled = true;
+  try {
+    const r = await fetch("/api/듣기/" + 방.d.id);
+    if (!r.ok) throw (await r.json()).detail;
+    소리.src = URL.createObjectURL(await r.blob());
+    await 소리.play(); b.textContent = "■ 멈춤";
+  } catch (e) { b.textContent = "🔊 다시 듣기"; alert(typeof e === "string" ? e : "소리를 만들지 못했어요."); }
+  b.disabled = false;
+};
+function 결과그리기(){
+  const d = 방.d; if (!d) return;
+  const m = d.계량 || {};
+  $("#r-q").innerHTML = `${esc(d.질문)}<br><span class="term">${d.라이브 ? "직접 물어본 질문" : `지난 기록 · ${esc(설정말[d.설정]?.[0] || d.설정)} · ${esc(몇번째(d.회차))}`} · 비용 약 ${Math.round(d.비용원)}원</span>`;
+  $("#r-answer").textContent = d.한마디로 || "(한마디로가 없어요)";
+  듣기멈춤(); $("#listen").disabled = !(d.한마디로 && d.id != null);
+  $("#r-src").innerHTML = `어느 주제에서 왔나 <span class="term">(근거)</span> · ` + ((d.한마디로근거 || []).map(t => {
+    const s = d.절들.find(x => x.절 === t);
+    return `<span class="chip" ${s ? `data-open="s${s.번호}"` : ""}>${esc(괄(t))}</span>`;
+  }).join(" ") || "없음");
+  $("#r-src").querySelectorAll("[data-open]").forEach(c => c.onclick = () => 펼치기(c.dataset.open, true));
+  $("#r-disc").textContent = d.면책;
+
+  // 누가 무엇을 읽고 무엇을 썼나
+  const 혼자 = d.설정 === "혼자";
+  let h = "";
+  if (!혼자) h += `<div class="who" data-id="코디"><div class="who-h"><img src="/static/img/${팀장초상}.jpg" alt="">
+      <span class="wn">팀장 <span class="term">(코디네이터)</span></span>
+      <span class="wp">질문을 ${d.목차.length}개 주제로 나눔 — 원문은 ${Math.round(m.격리율)}%만 봄 (나머지는 조사원만 읽음)</span><span class="arrow">▾</span></div>
+      <div class="who-b hide">${팀장본문(d)}</div></div>`;
+  d.절들.forEach(s => {
+    const p = 방.사람.find(x => x.id === "s" + s.번호) || {};
+    h += `<div class="who" data-id="s${s.번호}"><div class="who-h"><img src="/static/img/${p.img}.jpg" alt="">
+      <span class="wn">${esc(p.이름)}${s.절 !== s.역할 ? ` <span class="term">${esc(괄(s.절))}</span>` : ""}</span>
+      <span class="wp">${(s.읽음 || []).map(esc).join(" → ") || "읽은 것 없음"}</span>
+      <span class="${s.인용수 ? "ok" : "warnc"} small">${s.인용수 ? `출처 ${s.인용수}곳` : "출처 없음"}</span><span class="arrow">▾</span></div>
+      <div class="who-b hide">${조사원본문(s, d)}</div></div>`;
+  });
+  $("#r-who").innerHTML = h;
+  $("#r-who").querySelectorAll(".who-h").forEach(x => x.onclick = () => 펼치기(x.parentElement.dataset.id));
+  $("#r-who").querySelectorAll(".cite").forEach(c => c.onclick = () => 원문보기(c));
+
+  $("#report").innerHTML = 마크다운(d.보고서);
+  $("#fold-report summary").textContent = `보고서 전문 (${(m.보고서글자 || 0).toLocaleString()}자)`;
+  $("#metrics").innerHTML = 지표표(d);
+  비교그리기();
+}
+
+function 펼치기(id, 열기만 = false){
+  const w = document.querySelector(`.who[data-id="${id}"]`); if (!w) return;
+  const 열림 = 열기만 ? true : !w.classList.contains("open");
+  w.classList.toggle("open", 열림); w.querySelector(".who-b").classList.toggle("hide", !열림);
+  if (열기만) w.scrollIntoView({behavior:"smooth", block:"start"});
+}
+
+function 팀장본문(d){
+  return `<div class="small muted" style="margin-bottom:8px">팀장은 자료 원문을 보지 않고 제목과 첫머리 250자<span class="term">(카드)</span>만 보고 나눴어요.</div>
+    <div class="tablewrap"><table><tr><th>누구에게</th><th>주제 <span class="term">(절)</span></th><th>처음 읽을 자료 <span class="term">(시작 문서)</span></th><th>맡긴 물음</th></tr>
+    ${d.목차.map(t => `<tr><td>${esc(쉬운역할(t.역할))}</td><td><b>${esc(t.절)}</b></td>
+      <td>${t.시작문서 ? esc(괄(t.시작문서)) : "—"}</td><td>${esc(t.지시 || "")}</td></tr>`).join("")}</table></div>
+    ${(d.고침 || []).length ? `<div class="fix">⚠️ 팀장이 잘못 나눈 곳을 프로그램이 바로잡은 내역<br>${d.고침.map(esc).join("<br>")}</div>` : ""}`;
+}
+
+function 조사원본문(s, d){
+  const 혼자 = d.설정 === "혼자";                         // 혼자는 「다 찾았다」 보고 단계가 없다 (기록의 값은 baseline.py 가 칸을 채운 것)
+  return `<div class="small muted">${혼자 ? "혼자 하는 대조군" : `조사관 · ${esc(s.역할)}`}${혼자 ? "" : s.충분 === false ? ` · <span class="warnc">더 찾아야 한다고 보고</span>` : " · 다 찾았다고 보고"}</div>
+    <div class="lane-l">① 읽은 자료 <span class="term">(읽은 경로 — 테두리 굵은 것이 팀장이 정해 준 첫 자료)</span></div>
+    <div class="path">${(s.읽음 || []).map((t, i) =>
+      `${i ? '<span class="muted">→</span>' : ""}<span class="chip ${i === 0 && t === s.시작문서 ? "start" : ""}">${esc(t)}${방.법령인가(t) ? " · 법령" : ""}</span>`).join("")
+      || '<span class="muted">읽은 것 없음</span>'}</div>
+    <div class="memo"><div class="lane-l">② 자료마다 적은 메모 <span class="term">(원문은 여기서 손을 떠나고, 글은 메모만 보고 쓴다)</span></div>
+      ${s.메모 && s.메모.length
+        ? s.메모.map(x => `<details><summary>${esc(괄(x.문서))} <span class="muted small">${esc((x.메모 || "").length)}자</span></summary><div class="body">${esc(x.메모)}</div></details>`).join("")
+        : `<div class="small muted">이 기록은 메모를 남기기 전(2026-09-23 저녁)에 돌린 것이라 메모가 없어요.</div>`}</div>
+    <div class="draft"><div class="lane-l">③ 쓴 글 <span class="term">(원고)</span></div>
+      <div class="legend"><span><span class="cite read">초록</span> 읽은 자료를 출처로 붙임</span>
+        <span><span class="cite unread">빨강</span> 읽지 않은 자료를 붙임</span><span>회색 줄 = 출처 없는 문장</span>
+        <span>출처<span class="term">(인용)</span>를 누르면 원문에서 가까운 곳</span></div>
+      ${s.원고.map(p => `<p class="${p.조각.some(c => c.인용) ? "" : "nocite"}" data-s="${esc(p.문장)}">${p.조각.map(c => c.인용
+          ? `<span class="cite ${c.읽음 ? "read" : "unread"}" data-doc="${esc(c.인용)}">${esc(c.인용)}</span>` : esc(c.글)).join("")}</p>`).join("")
+        || '<span class="muted">쓴 글 없음</span>'}</div>
+    ${s.한줄 ? `<div class="lane-l">④ 팀장에게 올린 한 줄</div><div class="oneliner">${esc(s.한줄)}</div>` : ""}
+    ${!혼자 && s.충분 === false && s.부족사유 ? `<div class="small warnc" style="margin-top:8px">더 찾아야 하는 까닭 — ${esc(s.부족사유)}</div>` : ""}`;
+}
+
+function 비교그리기(){
+  const d = 방.d;
+  if (d.라이브){ $("#fold-cmp").classList.add("hide"); return; }
+  $("#fold-cmp").classList.remove("hide");
+  const 이질문 = 목록.filter(r => r.질문ID === d.질문ID);
+  const 있는설정 = new Set(이질문.map(r => r.설정));
+  $("#cfg").innerHTML = 설정순서.filter(s => 있는설정.has(s)).map(s =>
+    `<button data-v="${esc(s)}" aria-pressed="${s === d.설정}">${esc(설정말[s]?.[0] || s)}</button>`).join("");
+  $("#cfg-hint").textContent = 설정말[d.설정]?.[1] || "";
+  const 회차들 = 이질문.filter(r => r.설정 === d.설정).map(r => r.회차).sort();
+  $("#round").innerHTML = 회차들.map(n => `<button data-v="${esc(n)}" aria-pressed="${n === d.회차}">${esc(몇번째(n))}</button>`).join("");
+  const 바꾸기 = async (설정, 회차) => {
+    const r = 이질문.find(x => x.설정 === 설정 && x.회차 === 회차) || 이질문.find(x => x.설정 === 설정);
+    await 불러오기(r.id); 방.즉시 = true; await 재생(); 방.즉시 = false;
+    결과그리기(); $("#fold-cmp").open = true;
+  };
+  $("#cfg").querySelectorAll("button").forEach(b => b.onclick = () => 바꾸기(b.dataset.v, d.회차));
+  $("#round").querySelectorAll("button").forEach(b => b.onclick = () => 바꾸기(d.설정, b.dataset.v));
+}
+
+$("#save").onclick = () => {
+  const d = 방.d; if (!d) return;
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([d.보고서], {type:"text/markdown;charset=utf-8"}));
+  a.download = `보고서_${d.질문ID || "직접"}_${d.설정 || ""}_${d.회차 || ""}.md`; a.click(); URL.revokeObjectURL(a.href);
+};
+
+async function 원문보기(el){
+  const p = el.closest("p"), 있던 = p.nextElementSibling;
+  if (있던 && 있던.classList.contains("peek") && 있던.dataset.doc === el.dataset.doc){ 있던.remove(); return; }
+  if (있던 && 있던.classList.contains("peek")) 있던.remove();
+  const box = document.createElement("div");
+  box.className = "peek"; box.dataset.doc = el.dataset.doc; box.textContent = "원문을 찾는 중…"; p.after(box);
+  const r = await (await fetch("/api/원문?" + new URLSearchParams({문서: el.dataset.doc, 문장: p.dataset.s}))).json();
+  if (!r.있음){ box.innerHTML = `${esc(괄(el.dataset.doc))} 는 자료 창고에 없는 이름이에요 — 지어낸 이름일 수 있습니다.`; return; }
+  let 대목 = esc(r.대목);
+  (r.겹친낱말 || []).sort((a, b) => b.length - a.length).forEach(w => {
+    const 줄기 = esc(w.slice(0, Math.max(2, w.length - 1))); 대목 = 대목.split(줄기).join(`<mark>${줄기}</mark>`);
+  });
+  box.innerHTML = `<div class="small muted">${esc(괄(el.dataset.doc))} 원문(${r.문서글자.toLocaleString()}자)에서 이 문장과 낱말이 가장 많이 겹치는 곳 — 프로그램이 고른 <b>후보</b> · 겹친 낱말 ${Math.round(r.점 * 100)}%</div>
+    <div style="margin-top:6px">${대목 || '<span class="muted">겹치는 곳이 없어요</span>'}</div>
+    <div class="small muted" style="margin-top:6px">많이 겹친다고 맞게 붙은 것도, 적다고 틀린 것도 아니에요. 읽고 판단해 주세요.</div>`;
+}
+
+function 지표표(d){
+  const m = d.계량 || {};
+  return `<table class="metrics small" style="margin-top:10px">${Object.entries(d.지표설명).map(([k, 설명]) => {
+    const v = m[k], 켜짐 = k.startsWith("경보_") && v && v !== 0;
+    const 단위 = typeof v === "number" && ["근거율","격리율","중복률","절겹침률","편중"].includes(k) ? "%" : "";
+    return `<tr class="${켜짐 ? "alarm" : ""}"><td>${esc(k.replace("경보_", "⚠ "))}</td><td>${esc(v ?? "—")}${단위}</td><td class="muted">${esc(설명)}</td></tr>`;
+  }).join("")}</table>`;
+}
+
+function 마크다운(글){
+  const 줄 = esc(글 || "").split("\n"); let out = [], 목록 = false;
+  const 인라인 = t => t.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/(^|\s)_(.+?)_(?=\s|$)/g, "$1<i>$2</i>");
+  for (const l of 줄){
+    if (/^- /.test(l)){ if (!목록){ out.push("<ul>"); 목록 = true; } out.push(`<li>${인라인(l.slice(2))}</li>`); continue; }
+    if (목록){ out.push("</ul>"); 목록 = false; }
+    if (/^#{2,3} /.test(l)) out.push(`<h4>${인라인(l.replace(/^#+ /, ""))}</h4>`);
+    else if (/^# /.test(l)) out.push(`<h3>${인라인(l.slice(2))}</h3>`);
+    else if (/^&gt; ?/.test(l)) out.push(`<blockquote>${인라인(l.replace(/^&gt; ?/, ""))}</blockquote>`);
+    else if (l.trim()) out.push(`<p>${인라인(l)}</p>`);
+  }
+  if (목록) out.push("</ul>");
+  return out.join("");
+}
+
+/* ───────── 키 — 이 브라우저 안에만. 서버로는 요청 머리로만 보낸다 ───────── */
+const 키상자 = {
+  값: "", 저장칸: "openai키",
+  읽기(){ try{ this.값 = localStorage.getItem(this.저장칸) || ""; }catch{ this.값 = ""; } },
+  저장됨(){ try{ return !!localStorage.getItem(this.저장칸); }catch{ return false; } },
+  넣기(v, 남김){
+    this.값 = v.trim();
+    try{ 남김 ? localStorage.setItem(this.저장칸, this.값) : localStorage.removeItem(this.저장칸); }catch{}
+  },
+  지우기(){ this.값 = ""; try{ localStorage.removeItem(this.저장칸); }catch{} },
+  가림(){ return this.값 ? `sk-…${this.값.slice(-4)}` : ""; },
+  머리(){ return this.값 ? {"X-OpenAI-Key": this.값} : {}; },
+};
+function 키표시(){
+  const s = $("#key-state");
+  s.classList.toggle("on", !!키상자.값);
+  s.textContent = !키상자.값 ? "키 없음 — 지난 기록 보기는 그대로 쓸 수 있어요"
+    : 키상자.저장됨() ? `키 있음 (${키상자.가림()}) — 이 브라우저에 저장돼 있어요`
+    : `키 있음 (${키상자.가림()}) — 이 창에만 있어요. 창을 닫으면 사라져요`;
+  $("#key-keep").checked = 키상자.저장됨();
+  $("#live-go").disabled = !키상자.값;
+  $("#live-note").innerHTML = 키상자.값
+    ? `키 있음 (${esc(키상자.가림())}) · 한 번에 약 30원, 약 100원이 넘으면 자동으로 멈춰요. 끝나면 기록으로 남아요.`
+    : `키가 없어요 — 오른쪽 위 <a href="#키" style="color:#fff">⚙ 키</a> 에서 넣으면 쓸 수 있어요.`;
+}
+$("#key-show").onclick = () => {
+  const 보임 = $("#key").type === "text"; $("#key").type = 보임 ? "password" : "text"; $("#key-show").textContent = 보임 ? "보기" : "가리기";
+};
+$("#key-set").onclick = () => {
+  const v = $("#key").value.trim();
+  if (!v){ $("#key-msg").innerHTML = `<span class="warnc">키를 붙여 넣어 주세요.</span>`; return; }
+  if (!/^sk-[\x21-\x7e]{17,}$/.test(v)){ $("#key-msg").innerHTML = `<span class="warnc">키 모양이 아니에요. sk- 로 시작하는 키를 붙여 넣어 주세요.</span>`; return; }
+  키상자.넣기(v, $("#key-keep").checked); $("#key").value = ""; $("#key-msg").textContent = ""; 키표시();
+};
+$("#key-del").onclick = () => { 키상자.지우기(); $("#key").value = ""; $("#key-msg").textContent = "지웠어요."; 키표시(); };
+$("#key-keep").onchange = () => { if (키상자.값) 키상자.넣기(키상자.값, $("#key-keep").checked); 키표시(); };
+$("#key-check").onclick = async () => {
+  const 입력 = $("#key").value.trim();
+  const 머리 = 입력 ? {"X-OpenAI-Key": 입력} : 키상자.머리();
+  if (!머리["X-OpenAI-Key"]){ $("#key-msg").innerHTML = `<span class="warnc">먼저 키를 붙여 넣어 주세요.</span>`; return; }
+  $("#key-msg").textContent = "확인하는 중…";
+  try {
+    const r = await (await fetch("/api/키확인", {method:"POST", headers: 머리})).json();
+    $("#key-msg").innerHTML = r.됨 ? `<span class="ok">쓸 수 있는 키예요 (${esc(r.모델)}).</span>` : `<span class="warnc">${esc(r.까닭)}</span>`;
+  } catch { $("#key-msg").innerHTML = `<span class="warnc">서버에 닿지 못했어요.</span>`; }
+};
+키상자.읽기(); 키표시();
+
+시작().catch(e => { $("#qgrid").innerHTML = `<div class="muted">기록을 불러오지 못했습니다 — ${esc(e.message)}</div>`; });
+</script>
+</body>
+</html>

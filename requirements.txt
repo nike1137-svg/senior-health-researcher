@@ -1,0 +1,7 @@
+langgraph>=1.2
+langchain-openai>=1.6
+openai>=3.16
+python-dotenv>=1.2
+fastapi>=0.141
+uvicorn>=0.53
+edge-tts>=7.2

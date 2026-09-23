@@ -1,0 +1,42 @@
+# 비밀정보 — 절대 커밋 금지 (과제 원문: "API 키를 저장소에 올리지 마세요")
+.env
+.env.*
+!.env.example
+
+# 파이썬
+.venv/
+__pycache__/
+*.pyc
+
+# 실행 산출물 — 원문 구조상 output/ 은 제출물이다 (runs.jsonl · ablation.json · reports/).
+# runs.jsonl 은 커밋한다 — 데모 재생 탭이 읽는다. 단 스텁(가짜 점검)·빈 꼬리표 줄은
+# 커밋 전에 걷어낸다 (.gitignore 는 줄 단위로 못 거른다. 2026-09-23 첫 정리: 99 → 89줄)
+output/cache/
+
+# API 비용 장부 — 개인 지출 기록이라 저장소에 올리지 않는다.
+# 합계만 REPORT 에 적는다 (tools/cost.py 로 확인)
+output/cost.jsonl
+
+# 수집 원자료 캐시 (corpus.json 은 커밋, 중간 캐시는 제외)
+data/cache/
+
+# 확인하려고 만든 임시 출력 — 스크립트로 다시 만들 수 있다
+data/_*.txt
+tools/*.log
+
+# OS·편집기
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# 데모 임시 파일
+static/tts/*.mp3
+output/raw/
+
+# 기록 사본·무효 기록 — 실행 산출물이라 올리지 않는다 (REPORT 부록 F 에 요약)
+output/runs.jsonl.bak-*
+output/runs_무효.jsonl
+
+# 가짜 점검(스텁)·마지막 실행 사본 — 실행할 때마다 덮어쓴다
+output/reports/_*.md
