@@ -2,8 +2,8 @@
 
     python app.py          →  http://127.0.0.1:8000
 
-127.0.0.1 에만 뜬다. 같은 와이파이의 다른 기기에서도 들어올 수 없다.
-남이 들어와 API 를 부르면 돈이 나가기 때문이다.
+127.0.0.1 에만 뜬다. 밖에서는 Cloudflare 터널(senior.dodami-ai.com)로만 들어온다.
+서버는 작성자 키를 쓰지 않는다 — 직접 물어보기는 방문자가 넣은 키로만 돈다.
 
 과제 원문 5)
     보고서와 함께 **누가 무엇을 읽고 무엇을 썼는지**를 보여 준다.
@@ -15,14 +15,16 @@
 
 탭
     재생    runs.jsonl 기록을 다시 본다 — 키 없음 · 0원
-    라이브  (다음 단계) 사용자 키로 새로 돌린다
-    설정    (다음 단계) 키 넣기
+    라이브  방문자 키로 새로 돌린다 — 기록은 runs_live.jsonl 에 따로, 결과는 번호표를 받은 사람만 연다
+    설정    키 넣기 (이 브라우저 · 요청 머리에만)
     소리    결과의 「한마디로」 를 읽어 준다 (edge-tts) · 질문을 말로 넣는다 (브라우저 음성 인식)
 """
 from __future__ import annotations
 
 import json
 import queue
+import re
+import secrets
 import threading
 import time
 from datetime import datetime
@@ -62,7 +64,11 @@ _원문 = json.loads((루트 / "data" / "corpus_full.json").read_text(encoding="
 _법령 = sorted(set(_원문) - set(json.loads((루트 / "data" / "corpus.json").read_text(encoding="utf-8"))["docs"]))
 
 # 재생에 싣는 단계. 스텁 · 2~3단계의 이름 없는 실행은 뺀다.
-_싣는단계 = {"본실행", "시운전", "경로시험", "라이브"}
+# 라이브(방문자가 직접 물어본 것)는 싣지 않는다 — 늘 켜 두는 공개 주소라 남의 질문이 목록에 쌓여 보이면 안 된다 (작성자 결정 b)
+_싣는단계 = {"본실행", "시운전", "경로시험"}
+# 라이브 기록은 따로 둔다 (.gitignore). 물어본 사람만 끝날 때 받은 번호표로 결과 · 소리를 연다
+라이브파일 = 루트 / "output" / "runs_live.jsonl"
+_번호표꼴 = re.compile(r"^[A-Za-z0-9_-]{16,40}$")
 
 app = FastAPI(title="어르신 건강 조사팀", docs_url=None, redoc_url=None)
 
@@ -138,13 +144,40 @@ def _조각(본문: str, 읽음: set[str]) -> list[dict]:
     return out
 
 
+def _재생기록(i: int) -> dict:
+    """재생에 싣는 기록만 내준다. 라이브 · 스텁 줄은 번호를 알아도 열리지 않는다."""
+    줄 = _기록들()
+    if not 0 <= i < len(줄) or not _꼬리(줄[i]):
+        raise HTTPException(404, "그런 기록이 없습니다")
+    return 줄[i]
+
+
+def _라이브기록(표: str) -> dict:
+    if not _번호표꼴.match(표) or not 라이브파일.exists():
+        raise HTTPException(404, "그런 기록이 없습니다")
+    for x in 라이브파일.read_text(encoding="utf-8").splitlines():
+        if x.strip():
+            r = json.loads(x)
+            if r.get("계량", {}).get("표") == 표:
+                return r
+    raise HTTPException(404, "그런 기록이 없습니다")
+
+
 @app.get("/api/runs/{i}")
 def 한편(i: int):
-    줄 = _기록들()
-    if not 0 <= i < len(줄):
-        raise HTTPException(404, "그런 기록이 없습니다")
-    r = 줄[i]
-    k = _꼬리(r) or {}
+    r = _재생기록(i)
+    return _한편만들기(r, i, _꼬리(r))
+
+
+@app.get("/api/라이브결과/{token}")          # 주소 속 변수 이름은 영문만 된다 (Starlette)
+def 라이브결과(token: str):
+    표 = token
+    r = _라이브기록(표)
+    k = {"단계": "라이브", "코퍼스": "위키 + 법령", "설정": "기본", "질문ID": "직접", "회차": "-"}
+    return {**_한편만들기(r, None, k), "표": 표}
+
+
+def _한편만들기(r: dict, i: int | None, k: dict) -> dict:
     m = r.get("계량", {})
 
     # 최종본에 실린 원고 — graph 의 접기() 를 그대로 쓴다 (두 번째 원고 방침이 같은 규칙으로 적용된다)
@@ -273,14 +306,16 @@ def 라이브(몸: dict = Body(...), x_openai_key: str = Header(default="")):
                     쓴돈 = 남.쓴돈
             계량 = dict(결과.get("계량", {}), 걸린초=round(time.time() - 시작, 1))
             if 스텁:
-                q.put({"종류": "끝", "id": None, "비용원": 0})
+                q.put({"종류": "끝", "표": None, "비용원": 0})
                 return
+            표 = secrets.token_urlsafe(16)              # 추측할 수 없는 번호표 — 물어본 사람에게만 준다
             metrics.기록(
                 {**결과, "코퍼스이름": "corpus_full.json", "스위치": dict(설정["스위치"])},
-                계량, 비용=쓴돈,
+                dict(계량, 표=표), 비용=쓴돈,
                 꼬리표=f"라이브|corpus_full.json|기본|직접|{datetime.now():%Y%m%d-%H%M%S}",
+                파일=라이브파일,
             )
-            q.put({"종류": "끝", "id": len(_기록들()) - 1, "비용원": round(쓴돈 * 1450, 1)})
+            q.put({"종류": "끝", "표": 표, "비용원": round(쓴돈 * 1450, 1)})
         except graph.예산초과:
             q.put({"종류": "오류", "까닭": f"한 번 실행 상한(약 {round(라이브상한달러 * 1450)}원)에 닿아 멈췄어요."})
         except Exception as e:
@@ -318,20 +353,18 @@ def 라이브(몸: dict = Body(...), x_openai_key: str = Header(default="")):
 #   같은 기록은 한 번 만든 소리를 다시 쓴다
 # ─────────────────────────────────────────────────────────────
 목소리 = "ko-KR-SunHiNeural"
-_소리: dict[int, bytes] = {}
+_소리: dict[str, bytes] = {}
 
 
-@app.get("/api/듣기/{i}")
-async def 듣기(i: int):
+async def _소리로(열쇠: str, 글: str):
     from fastapi.responses import Response
-    줄 = _기록들()
-    if not 0 <= i < len(줄) or not 줄[i].get("한마디로"):
+    if not 글:
         raise HTTPException(404, "읽어 줄 한마디로가 없습니다")
-    if i not in _소리:
+    if 열쇠 not in _소리:
         import edge_tts
         소리 = b""
         try:
-            async for 조각 in edge_tts.Communicate(줄[i]["한마디로"], 목소리).stream():
+            async for 조각 in edge_tts.Communicate(글, 목소리).stream():
                 if 조각["type"] == "audio":
                     소리 += 조각["data"]
         except Exception as e:
@@ -339,8 +372,18 @@ async def 듣기(i: int):
             raise HTTPException(502, "소리를 만들지 못했어요. 잠시 뒤 다시 눌러 주세요.")
         if len(_소리) >= 200:
             _소리.clear()
-        _소리[i] = 소리
-    return Response(_소리[i], media_type="audio/mpeg")
+        _소리[열쇠] = 소리
+    return Response(_소리[열쇠], media_type="audio/mpeg")
+
+
+@app.get("/api/듣기/{i}")
+async def 듣기(i: int):
+    return await _소리로(f"기록{i}", _재생기록(i).get("한마디로", ""))
+
+
+@app.get("/api/듣기/라이브/{token}")
+async def 듣기_라이브(token: str):
+    return await _소리로(f"라이브{token}", _라이브기록(token).get("한마디로", ""))
 
 
 # ─────────────────────────────────────────────────────────────

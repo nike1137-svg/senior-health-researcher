@@ -394,8 +394,8 @@ async function 재생(){
       방.말함("코디", true); 방.알약("코디", "질문을 나누는 중", "run");
       await 방.쉼(1300);
       방.기록(`팀장이 질문을 ${d.목차.length}개 주제로 나눴어요 — ${d.목차.map(t => 괄(t.절)).join(" ")}`);
-      방.기록("팀장은 자료 원문을 보지 않고 제목과 첫머리만 봤어요");
-      if ((d.고침 || []).length) 방.기록(`⚠ 팀장이 잘못 나눈 곳을 프로그램이 ${d.고침.length}곳 바로잡았어요`, "warn");
+      방.기록("팀장은 긴 원문 대신 제목과 첫머리만 보고 나눠요 — 원문은 조사원 넷이 나눠 읽어요");
+      if ((d.고침 || []).length) 방.기록("팀장이 같은 자료를 여러 주제에 주거나 없는 이름을 써서, 프로그램이 바로잡았어요", "warn");
       await 방.쉼(800);
       d.절들.forEach(s => { 방.알약("s" + s.번호, `${괄(s.절)} 맡음`); 방.기록(`${이가(방.누구("s" + s.번호))} ${을를(s.절, 괄(s.절))} 맡았어요`); });
       방.알약("코디", `${d.절들.length}명에게 나눠 줌`); 방.말함("코디", false);
@@ -524,8 +524,8 @@ function 라이브사건(d, x){
       방.사람그리기(d);
       방.알약("코디", `${d.절들.length}명에게 나눠 줌`); 방.말함("코디", false);
       방.기록(`팀장이 질문을 ${x.목차.length}개 주제로 나눴어요 — ${x.목차.map(t => 괄(t.절)).join(" ")}`);
-      방.기록("팀장은 자료 원문을 보지 않고 제목과 첫머리만 봤어요");
-      if ((x.고침 || []).length) 방.기록(`⚠ 팀장이 잘못 나눈 곳을 프로그램이 ${x.고침.length}곳 바로잡았어요`, "warn");
+      방.기록("팀장은 긴 원문 대신 제목과 첫머리만 보고 나눠요 — 원문은 조사원 넷이 나눠 읽어요");
+      if ((x.고침 || []).length) 방.기록("팀장이 같은 자료를 여러 주제에 주거나 없는 이름을 써서, 프로그램이 바로잡았어요", "warn");
       d.절들.forEach(s => { 방.알약("s" + s.번호, `${괄(s.절)} 맡음`); 방.기록(`${이가(누구(s.번호))} ${을를(s.절, 괄(s.절))} 맡았어요`); });
       방.상태("② 찾아 읽는 중", true); 방.기록("② 찾아 읽기 — 네 명이 동시에", "단계");
       break;
@@ -568,10 +568,11 @@ async function 라이브끝(d, x){
     $("#to-result").disabled = true;
     return;
   }
-  if (x.id == null){                                   // 스텁 시험 — 기록을 남기지 않았다
+  if (x.표 == null){                                   // 스텁 시험 — 기록을 남기지 않았다
     d.진행중 = false; 방.기록("끝 (배선 시험 — 기록 안 함)"); 방.상태("끝"); return;
   }
-  const 전부 = await (await fetch("/api/runs/" + x.id)).json();
+  // 라이브 결과는 목록에 싣지 않는다 — 끝날 때 받은 번호표로 이 창에서만 연다
+  const 전부 = await (await fetch("/api/라이브결과/" + encodeURIComponent(x.표))).json();
   방.d = 전부; 방.끝남 = true;
   방.기록(`끝 — 이번에 든 돈 약 ${Math.round(x.비용원)}원`);
   방.상태("끝 — 결과를 보세요");
@@ -626,7 +627,7 @@ $("#listen").onclick = async () => {
   if (!소리.paused){ 듣기멈춤(); return; }
   const b = $("#listen"); b.textContent = "소리 만드는 중…"; b.disabled = true;
   try {
-    const r = await fetch("/api/듣기/" + 방.d.id);
+    const r = await fetch(방.d.표 ? "/api/듣기/라이브/" + encodeURIComponent(방.d.표) : "/api/듣기/" + 방.d.id);
     if (!r.ok) throw (await r.json()).detail;
     소리.src = URL.createObjectURL(await r.blob());
     await 소리.play(); b.textContent = "■ 멈춤";
@@ -638,7 +639,7 @@ function 결과그리기(){
   const m = d.계량 || {};
   $("#r-q").innerHTML = `${esc(d.질문)}<br><span class="term">${d.라이브 ? "직접 물어본 질문" : `지난 기록 · ${esc(설정말[d.설정]?.[0] || d.설정)} · ${esc(몇번째(d.회차))}`} · 비용 약 ${Math.round(d.비용원)}원</span>`;
   $("#r-answer").textContent = d.한마디로 || "(한마디로가 없어요)";
-  듣기멈춤(); $("#listen").disabled = !(d.한마디로 && d.id != null);
+  듣기멈춤(); $("#listen").disabled = !(d.한마디로 && (d.id != null || d.표));
   $("#r-src").innerHTML = `어느 주제에서 왔나 <span class="term">(근거)</span> · ` + ((d.한마디로근거 || []).map(t => {
     const s = d.절들.find(x => x.절 === t);
     return `<span class="chip" ${s ? `data-open="s${s.번호}"` : ""}>${esc(괄(t))}</span>`;
@@ -679,7 +680,7 @@ function 펼치기(id, 열기만 = false){
 }
 
 function 팀장본문(d){
-  return `<div class="small muted" style="margin-bottom:8px">팀장은 자료 원문을 보지 않고 제목과 첫머리 250자<span class="term">(카드)</span>만 보고 나눴어요.</div>
+  return `<div class="small muted" style="margin-bottom:8px">팀장은 긴 원문 대신 제목과 첫머리 250자<span class="term">(카드)</span>만 보고 나눴어요 — 원문은 조사원 넷이 나눠 읽었어요.</div>
     <div class="tablewrap"><table><tr><th>누구에게</th><th>주제 <span class="term">(절)</span></th><th>처음 읽을 자료 <span class="term">(시작 문서)</span></th><th>맡긴 물음</th></tr>
     ${d.목차.map(t => `<tr><td>${esc(쉬운역할(t.역할))}</td><td><b>${esc(t.절)}</b></td>
       <td>${t.시작문서 ? esc(괄(t.시작문서)) : "—"}</td><td>${esc(t.지시 || "")}</td></tr>`).join("")}</table></div>

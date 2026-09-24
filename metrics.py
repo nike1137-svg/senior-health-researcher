@@ -256,7 +256,8 @@ def 경보들(계량: dict) -> list[str]:
 #        4단계 절제 실험이 여기서 집계하고, 5단계 데모가 여기서 재생한다.
 #        기록이 없으면 같은 실행을 두 번 돌려야 한다 (돈이 두 배로 든다).
 # ─────────────────────────────────────────────────────────────
-def 기록(상태: dict, 계량: dict, 비용: float = 0.0, 꼬리표: str = "") -> None:
+def 기록(상태: dict, 계량: dict, 비용: float = 0.0, 꼬리표: str = "", 파일: Path | None = None) -> None:
+    """한 실행을 한 줄로 남긴다. 파일을 주지 않으면 runs.jsonl (데모 라이브는 따로 — app.py)."""
     한줄 = {
         "꼬리표": 꼬리표,
         "비용달러": round(비용, 6),
@@ -274,8 +275,9 @@ def 기록(상태: dict, 계량: dict, 비용: float = 0.0, 꼬리표: str = "")
         ],
         "보고서": 상태.get("보고서", ""),
     }
-    기록파일.parent.mkdir(parents=True, exist_ok=True)
-    with 기록파일.open("a", encoding="utf-8") as f:
+    파일 = 파일 or 기록파일
+    파일.parent.mkdir(parents=True, exist_ok=True)
+    with 파일.open("a", encoding="utf-8") as f:
         f.write(json.dumps(한줄, ensure_ascii=False) + "\n")
 
 

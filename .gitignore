@@ -40,3 +40,8 @@ output/runs_무효.jsonl
 
 # 가짜 점검(스텁)·마지막 실행 사본 — 실행할 때마다 덮어쓴다
 output/reports/_*.md
+
+# 데모 라이브 기록 — 방문자 질문이 들어간다. 저장소에 올리지 않는다 (작성자 결정 b)
+output/runs_live.jsonl
+# 노트북 자동 시작 스크립트 · 로그 (이 기기 전용 경로가 들어 있다)
+autostart/
